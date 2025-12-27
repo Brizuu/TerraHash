@@ -7,6 +7,7 @@ import de.btegermany.terraplusminus.commands.WhereCommand;
 import de.btegermany.terraplusminus.events.PlayerJoinEvent;
 import de.btegermany.terraplusminus.events.PlayerMoveEvent;
 import de.btegermany.terraplusminus.events.PluginMessageEvent;
+import de.btegermany.terraplusminus.gen.PlayerMoveListener;
 import de.btegermany.terraplusminus.gen.RealWorldGenerator;
 import de.btegermany.terraplusminus.utils.ConfigurationHelper;
 import de.btegermany.terraplusminus.utils.PluginConfigManipulator;
@@ -71,7 +72,9 @@ public final class Terraplusminus extends JavaPlugin implements Listener {
         this.getServer().getMessenger().registerIncomingPluginChannel(this, "bungeecord:terraplusminus", new PluginMessageEvent(playerHashMapManagement));
         // --------------------------
 
+
         // Registering events
+        getServer().getPluginManager().registerEvents(new PlayerMoveListener(), this);
         Bukkit.getPluginManager().registerEvents(this, this);
         if (Terraplusminus.config.getBoolean("height_in_actionbar")) {
             Bukkit.getPluginManager().registerEvents(new PlayerMoveEvent(this), this);

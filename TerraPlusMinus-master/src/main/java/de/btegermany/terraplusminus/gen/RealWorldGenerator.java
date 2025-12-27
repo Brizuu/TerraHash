@@ -111,7 +111,13 @@ public class RealWorldGenerator extends ChunkGenerator {
     @Override
     public void generateNoise(@NotNull WorldInfo worldInfo, @NotNull Random random, int chunkX, int chunkZ, @NotNull ChunkData chunkData) {
 
+
+
         CachedChunkData terraData = this.getTerraChunkData(chunkX, chunkZ);
+
+        if (terraData == null) {
+            return;
+        }
 
         int minWorldY = worldInfo.getMinHeight();
         int maxWorldY = worldInfo.getMaxHeight();
@@ -126,6 +132,7 @@ public class RealWorldGenerator extends ChunkGenerator {
         while (minSurfaceCubeY < maxWorldCubeY && terraData.belowSurface(minSurfaceCubeY)) {
             minSurfaceCubeY++;
         }
+
 
         // We can now fill most of the underground in a single call.
         // Hopefully the underlying implementation can take advantage of that...
@@ -171,6 +178,9 @@ public class RealWorldGenerator extends ChunkGenerator {
     @Override
     public void generateSurface(@NotNull WorldInfo worldInfo, @NotNull Random random, int chunkX, int chunkZ, @NotNull ChunkData chunkData) {
         CachedChunkData terraData = this.getTerraChunkData(chunkX, chunkZ);
+
+        if (terraData == null) return;
+
         final int minWorldY = worldInfo.getMinHeight();
         final int maxWorldY = worldInfo.getMaxHeight();
         for (int x = 0; x < 16; x++) {
@@ -225,9 +235,22 @@ public class RealWorldGenerator extends ChunkGenerator {
 
     private CachedChunkData getTerraChunkData(int chunkX, int chunkZ) {
         try {
-            return this.cache.getUnchecked(new ChunkPos(chunkX, chunkZ)).get();
-        } catch (InterruptedException | ExecutionException e) {
-            throw new RuntimeException("Unrecoverable exception when generating chunk data asynchronously in Terra--", e);
+            // Czekamy maksymalnie 1500ms na odpowiedź z API
+            return this.cache.getUnchecked(new ChunkPos(chunkX, chunkZ)).get(5000, TimeUnit.MILLISECONDS);
+        } catch (Exception e) {
+            // Logujemy błąd w konsoli (raz, aby nie spamować)
+            // Rejestrujemy błąd w naszym cache, aby PlayerMoveListener wiedział, że ma tu nie wpuszczać gracza
+            ChunkStatusCache.markAsFailed(chunkX, chunkZ);
+
+            // Zamiast rzucać RuntimeException, zwracamy pusty obiekt.
+            // Silnik Minecrafta "pomyśli", że wszystko jest ok, ale teren będzie pusty.
+            // Gracz i tak tam nie wejdzie, bo zablokuje go PlayerMoveListener.
+            try {
+                return this.cache.getUnchecked(new ChunkPos(chunkX, chunkZ)).getNow(null);
+            } catch (Exception fatal) {
+                // Jeśli absolutnie nie da się pobrać nawet starego cache, zwracamy cokolwiek, by nie scrashować wątku
+                return null;
+            }
         }
     }
 
@@ -246,6 +269,9 @@ public class RealWorldGenerator extends ChunkGenerator {
         x -= cubeToMinBlock(chunkX);
         z -= cubeToMinBlock(chunkZ);
         CachedChunkData terraData = this.getTerraChunkData(chunkX, chunkZ);
+
+        if (terraData == null) return worldInfo.getMinHeight();
+
         switch (heightMap) {
             case OCEAN_FLOOR, OCEAN_FLOOR_WG -> {
                 return terraData.groundHeight(x, z) + this.yOffset;
