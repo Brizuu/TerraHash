@@ -1,0 +1,70 @@
+# The prefix is written in front of every message that is sent to the chat by the plugin.
+prefix: '§2§lT+- §8» '
+
+# If disabled, the plugin will log every fetched data to the console
+reduced_console_messages: true
+
+# If this option is enabled, the plugin will copy a datapack with the name 'world-height-datapack.zip' to the world directory, which expands the world to the maximum possibly with a datapack 2032.
+height_datapack: false
+
+# If enabled, it will show the height of the player in the actionbar.
+height_in_actionbar: false
+
+
+
+# Tpll ------------------------------------------------
+# Set bounds so that players can only tpll within these limits. They will get a message that the area is being worked on by another build team.
+# The option is turned off when all values are 0.0
+# -----------------------------------------------------
+min_latitude: 0.0               # Example: 46.94694079137405
+max_latitude: 0.0               #          55.337721930180116
+min_longitude: 0.0              #          1.9049932813372725
+max_longitude: 0.0              #          15.665992332846406
+
+# Passthrough tpll to other bukkit plugins. It will not passthrough when it's empty. Type in the name of your plugin. E.g. Your plugin name is vanillatpll you set passthrough_tpll: 'vanillatpll'
+passthrough_tpll: ''
+
+
+
+# Generation -------------------------------------------
+# Offset your section which fits into the world.
+terrain_offset:
+  x: 0
+  y: 0
+  z: 0
+
+# Linked worlds ---------------------------------------
+# If the height limit in this world/server is not enough, other worlds/servers can be linked to generate higher or lower sections
+linked_worlds:
+  enabled: false
+  method: 'MULTIVERSE'                         # 'SERVER' or 'MULTIVERSE'
+  # if method = MULTIVERSE -> world_name, y-offset
+  worlds:
+    - name: another_world/server          # e.g. this world/server has a datapack to extend height to 2032. it covers the height section (-2032) - (-1) m a.s.l. it has a y-offset of -2032.
+      offset: 2032
+    - name: current_world/server                 # do not change! e.g. this world/server has a datapack to extend height to 2032. it covers the height section 0 - 2032 m a.s.l.
+      offset: 0
+    - name: another_world/server                 # e.g. this world/server has a datapack to extend height to 2032. it covers the height section 2033 - 4064 m a.s.l. it has a y-offset of 2032
+      offset: -2032
+
+
+# If disabled, tree generation is turned off.
+generate_trees: true
+
+
+biomes:
+  # If 'use_dataset' is enabled, biomes will be generated based on: https://en.wikipedia.org/wiki/K%C3%B6ppen_climate_classification.
+  use_dataset: true
+  # If 'use_dataset' is disabled, this biome will be used everywhere instead (if 'generate_trees' is also enabled -> oak and birch).
+  # Possible values found in "Resource location" on: https://minecraft.wiki/w/Biome#Biome_IDs (use with namespace e.g. minecraft:plains)
+  biome: minecraft:plains
+
+# Customize the material, the blocks will be generated with.
+surface_material: GRASS_BLOCK
+building_outlines_material: BRICKS
+road_material: GRAY_CONCRETE_POWDER
+path_material: MOSS_BLOCK
+# -----------------------------------------------------
+
+# NOTE: Do not change
+config_version: 1.5
