@@ -53,7 +53,6 @@ public class RealWorldGenerator extends ChunkGenerator {
     private final Material surfaceMaterial;
     private final Map<String, Material> materialMapping;
 
-    // Licznik aktywnych zapytań HTTP do API
     private static final AtomicInteger activeRequests = new AtomicInteger(0);
     private static final Random randomDelay = new Random();
 
@@ -85,7 +84,6 @@ public class RealWorldGenerator extends ChunkGenerator {
         this.settings = settings.withProjection(projection);
         this.customBiomeProvider = new CustomBiomeProvider(projection);
 
-        // Zoptymalizowany Cache z obsługą softValues (ratuje RAM)
         this.cache = CacheBuilder.newBuilder()
                 .expireAfterAccess(5L, TimeUnit.MINUTES)
                 .softValues()
@@ -99,48 +97,43 @@ public class RealWorldGenerator extends ChunkGenerator {
         );
     }
 
-    private static long globalApiLockoutUntil = 0; // Globalna blokada przy błędach
+    private static long globalApiLockoutUntil = 0;
 
     private CachedChunkData getTerraChunkData(int chunkX, int chunkZ) {
         long currentTime = System.currentTimeMillis();
 
-        // 1. Sprawdzenie blokady globalnej
         if (currentTime < globalApiLockoutUntil) {
             return null;
         }
 
         try {
-            // 2. Throttling - nie pozwalamy na zbyt wiele równoległych zapytań
             if (activeRequests.get() >= 1) {
                 Thread.sleep(100);
             }
 
             activeRequests.incrementAndGet();
 
-            // 3. Pobieranie z krótkim timeoutem (1.5s)
             CompletableFuture<CachedChunkData> future = this.cache.getUnchecked(new ChunkPos(chunkX, chunkZ));
             return future.get(1500, TimeUnit.MILLISECONDS);
 
         } catch (Exception e) {
-            // 4. Pobieramy pełny opis błędu, zamieniamy na małe litery dla łatwiejszego porównania
             String fullError = e.toString().toLowerCase();
             if (e.getCause() != null) {
                 fullError += " " + e.getCause().toString().toLowerCase();
             }
 
-            // 5. Rozszerzona lista fraz blokujących (dodano 'peer')
             if (fullError.contains("reset") ||
                     fullError.contains("peer") ||
                     fullError.contains("429") ||
                     fullError.contains("too many")) {
 
-                globalApiLockoutUntil = currentTime + 30000; // 30s twardej przerwy
+                globalApiLockoutUntil = currentTime + 30000;
 
-                Terraplusminus.instance.getLogger().severe("!!! API BLOCKADE: Connection reset by peer / Rate limit !!!");
-                Terraplusminus.instance.getLogger().severe("Wykryto odrzucenie połączenia przez API. Blokada zapytań na 30 sekund.");
+                Terraplusminus.instance.getLogger().severe("--- API BLOCKADE: Connection reset by peer / Rate limit ---");
+                Terraplusminus.instance.getLogger().severe("API connection rejection detected. Queries blocked for 30 seconds.");
             }
             else if (fullError.contains("timeout")) {
-                globalApiLockoutUntil = currentTime + 10000; // 10s przerwy przy zwykłym przekroczeniu czasu
+                globalApiLockoutUntil = currentTime + 10000;
             }
 
             this.cache.invalidate(new ChunkPos(chunkX, chunkZ));

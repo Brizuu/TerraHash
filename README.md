@@ -1,6 +1,7 @@
-# TerraPlusMinus-PL 🌍
+![](https://i.imgur.com/evWWOux.png)
+# Terra# 🌍
 
-**TerraPlusMinus-PL** is a highly optimized fork of the TerraPlusMinus project, specifically tuned for the **BuildTheEarth** project. This plugin bridges OpenStreetMap (OSM) data and real-world elevation into Minecraft with a focus on stability, high performance, and error-free terrain generation.
+**Terra#** is a highly optimized fork of the TerraPlusMinus project, specifically tuned for the **BuildTheEarth** project. This plugin bridges OpenStreetMap (OSM) data and real-world elevation into Minecraft with a focus on stability, high performance, and error-free terrain generation.
 
 ---
 

@@ -40,13 +40,11 @@ public class TpllCommand implements BasicCommand {
             return;
         }
 
-        // --- OBSŁUGA SELEKTORÓW ---
         if (args.length > 0 && (args[0].startsWith("@") || !isDouble(args[0].replace(",", "").replace("°", ""))) && player.hasPermission("t+-.forcetpll")) {
             handleEntitySelectors(player, args);
             return;
         }
 
-        // --- PASSTHROUGH ---
         String passthroughTpll = Terraplusminus.config.getString("passthrough_tpll");
         if (passthroughTpll != null && !passthroughTpll.isEmpty()) {
             if (args.length == 0) {
@@ -62,7 +60,6 @@ public class TpllCommand implements BasicCommand {
             return;
         }
 
-        // --- PRZETWARZANIE WSPÓŁRZĘDNYCH ---
         World tpWorld = player.getWorld();
         double[] coordinates = new double[2];
         try {
@@ -92,7 +89,6 @@ public class TpllCommand implements BasicCommand {
             return;
         }
 
-        // Sprawdzanie uprawnień admina (granice pracy)
         if (!player.hasPermission("t+-.admin")) {
             double minLat = Terraplusminus.config.getDouble("min_latitude");
             double maxLat = Terraplusminus.config.getDouble("max_latitude");
@@ -112,21 +108,17 @@ public class TpllCommand implements BasicCommand {
         double targetZ = mcCoordinates[1] + zOffset;
 
         if (args.length >= 3) {
-            // Podano wysokość ręcznie
             double height = Double.parseDouble(args[2]) + yOffset;
             finalizeTeleport(player, tpWorld, mcCoordinates, height, xOffset, zOffset, coordinates, true);
         } else {
-            // Automatyczne wykrywanie wysokości - asynchronicznie
             player.sendMessage(Terraplusminus.config.getString("prefix") + "§7Locating position...");
 
             tpWorld.getChunkAtAsync((int) targetX >> 4, (int) targetZ >> 4).thenAccept(chunk -> {
                 int internalHeight = tpWorld.getHighestBlockYAt((int) targetX, (int) targetZ);
 
                 if (internalHeight > tpWorld.getMinHeight() + 1) {
-                    // Chunk już ma teren w grze
                     finalizeTeleport(player, tpWorld, mcCoordinates, internalHeight + 1.0, xOffset, zOffset, coordinates, true);
                 } else {
-                    // Pusty chunk - pytamy API
                     player.sendMessage(Terraplusminus.config.getString("prefix") + "§7Fetching elevation from API...");
                     TerraConnector terraConnector = new TerraConnector();
                     terraConnector.getHeight((int) mcCoordinates[0], (int) mcCoordinates[1])
@@ -156,7 +148,6 @@ public class TpllCommand implements BasicCommand {
 
         Location location = new Location(tpWorld, mcCoordinates[0] + xOffset, height, mcCoordinates[1] + zOffset, player.getLocation().getYaw(), player.getLocation().getPitch());
 
-        // Klucz: Używamy tylko asynchronicznej metody bez blokujących sprawdzeń
         PaperLib.teleportAsync(player, location).thenAccept(success -> {
             if (success) {
                 player.sendMessage(Terraplusminus.config.getString("prefix") + "§7Teleported to " + geoCoordinates[1] + ", " + geoCoordinates[0]);

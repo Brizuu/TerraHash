@@ -5,11 +5,11 @@
     <modelVersion>4.0.0</modelVersion>
 
     <groupId>de.btegermany</groupId>
-    <artifactId>terraplusminus</artifactId>
+    <artifactId>terrahash</artifactId>
     <version>1.5.2</version>
     <packaging>jar</packaging>
 
-    <name>Terraplusminus</name>
+    <name>TerraHash</name>
 
     <description>A plugin which implements the terra-- api in a papermc plugin</description>
     <properties>
