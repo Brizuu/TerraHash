@@ -30,6 +30,7 @@ import org.jetbrains.annotations.Nullable;
 import java.util.*;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import static java.lang.Math.min;
@@ -99,49 +100,109 @@ public class RealWorldGenerator extends ChunkGenerator {
 
     private static long globalApiLockoutUntil = 0;
 
+//    private CachedChunkData getTerraChunkData(int chunkX, int chunkZ) {
+//        long currentTime = System.currentTimeMillis();
+//
+//        if (currentTime < globalApiLockoutUntil) {
+//            return null;
+//        }
+//
+//        try {
+//            if (activeRequests.get() >= 1) {
+//                Thread.sleep(100);
+//            }
+//
+//            activeRequests.incrementAndGet();
+//
+//            CompletableFuture<CachedChunkData> future = this.cache.getUnchecked(new ChunkPos(chunkX, chunkZ));
+//            return future.get(1500, TimeUnit.MILLISECONDS);
+//
+//        } catch (Exception e) {
+//            String fullError = e.toString().toLowerCase();
+//            if (e.getCause() != null) {
+//                fullError += " " + e.getCause().toString().toLowerCase();
+//            }
+//
+//            if (fullError.contains("reset") ||
+//                    fullError.contains("peer") ||
+//                    fullError.contains("429") ||
+//                    fullError.contains("too many")) {
+//
+//                globalApiLockoutUntil = currentTime + 30000;
+//
+//                Terraplusminus.instance.getLogger().severe("--- API BLOCKADE: Connection reset by peer / Rate limit ---");
+//                Terraplusminus.instance.getLogger().severe("API connection rejection detected. Queries blocked for 30 seconds.");
+//            }
+//            else if (fullError.contains("timeout")) {
+//                globalApiLockoutUntil = currentTime + 10000;
+//            }
+//
+//            this.cache.invalidate(new ChunkPos(chunkX, chunkZ));
+//            ChunkStatusCache.markAsFailed(chunkX, chunkZ);
+//            return null;
+//        } finally {
+//            activeRequests.decrementAndGet();
+//        }
+//    }
+
+    private final ThreadLocal<Map<ChunkPos, CachedChunkData>> sessionCache = ThreadLocal.withInitial(HashMap::new);
+
     private CachedChunkData getTerraChunkData(int chunkX, int chunkZ) {
+        ChunkPos pos = new ChunkPos(chunkX, chunkZ);
+
+        // 1. SESSION CACHE: Błyskawiczny zwrot danych, jeśli już raz o nie pytaliśmy.
+        Map<ChunkPos, CachedChunkData> currentSession = sessionCache.get();
+        if (currentSession.containsKey(pos)) {
+            return currentSession.get(pos);
+        }
+
         long currentTime = System.currentTimeMillis();
 
-        if (currentTime < globalApiLockoutUntil) {
-            return null;
-        }
+        // 2. Blokada globalna - jeśli API nas odcięło, nie marnujemy ani milisekundy.
+        if (currentTime < globalApiLockoutUntil) return null;
 
+        // 3. Limit aktywnych połączeń (zmniejszony do 3 dla odciążenia oświetlenia)
+        // Twój serwer jest tak przeciążony, że 3 zapytania naraz to max, co udźwignie bez lagów.
+        if (activeRequests.get() >= 3) return null;
+
+        CachedChunkData data = null;
         try {
-            if (activeRequests.get() >= 1) {
-                Thread.sleep(100);
-            }
-
             activeRequests.incrementAndGet();
 
-            CompletableFuture<CachedChunkData> future = this.cache.getUnchecked(new ChunkPos(chunkX, chunkZ));
-            return future.get(1500, TimeUnit.MILLISECONDS);
+            CompletableFuture<CachedChunkData> future = this.cache.getIfPresent(pos);
+            if (future == null) {
+                future = this.cache.getUnchecked(pos);
+            }
+
+            // 4. Timeout 3 sekundy.
+            data = future.handle((d, ex) -> {
+                if (ex != null) {
+                    String msg = ex.toString().toLowerCase();
+                    // Jeśli API nas odcina (Connection Refused/Reset/429), blokujemy na 60s.
+                    if (msg.contains("reset") || msg.contains("429") || msg.contains("refused")) {
+                        globalApiLockoutUntil = System.currentTimeMillis() + 60000;
+                    }
+                    return null;
+                }
+                return d;
+            }).get(3000, TimeUnit.MILLISECONDS);
 
         } catch (Exception e) {
-            String fullError = e.toString().toLowerCase();
-            if (e.getCause() != null) {
-                fullError += " " + e.getCause().toString().toLowerCase();
+            if (!(e instanceof TimeoutException)) {
+                this.cache.invalidate(pos);
             }
-
-            if (fullError.contains("reset") ||
-                    fullError.contains("peer") ||
-                    fullError.contains("429") ||
-                    fullError.contains("too many")) {
-
-                globalApiLockoutUntil = currentTime + 30000;
-
-                Terraplusminus.instance.getLogger().severe("--- API BLOCKADE: Connection reset by peer / Rate limit ---");
-                Terraplusminus.instance.getLogger().severe("API connection rejection detected. Queries blocked for 30 seconds.");
-            }
-            else if (fullError.contains("timeout")) {
-                globalApiLockoutUntil = currentTime + 10000;
-            }
-
-            this.cache.invalidate(new ChunkPos(chunkX, chunkZ));
-            ChunkStatusCache.markAsFailed(chunkX, chunkZ);
-            return null;
         } finally {
             activeRequests.decrementAndGet();
+
+            // ZAPAMIĘTUJEMY WYNIK (nawet null)
+            currentSession.put(pos, data);
+
+            // Czyścimy sesję po 16 wpisach (rozmiar jednego "regionu" zapytań)
+            if (currentSession.size() > 16) {
+                currentSession.clear();
+            }
         }
+        return data;
     }
 
     @Override
